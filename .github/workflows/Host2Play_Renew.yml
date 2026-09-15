@@ -83,6 +83,18 @@ jobs:
           echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 1.0.0.1" \
             | sudo tee /etc/resolv.conf
 
+      - name: WARP 诊断
+        run: |
+          echo "=== warp-cli status ==="
+          warp-cli --accept-tos status || true
+          echo "=== cloudflare trace（warp=on 先算隧道生效）==="
+          curl -s --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -E "warp=|ip=" || echo "trace 失败"
+          echo "=== DNS 解析 ==="
+          getent hosts host2play.gratis || echo "解析失败"
+          echo "=== host2play 直连测试 ==="
+          curl -s --max-time 15 -o /dev/null -w "HTTP %{http_code} time=%{time_total}s\n" \
+            "https://host2play.gratis/" || echo "连唔上 host2play"
+
       - name: 创建输出目录
         run: mkdir -p output/screenshots
 
