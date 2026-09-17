@@ -22,8 +22,7 @@ except ImportError:
 RENEW_URLS = [
     # 账号 01
     "https://host2play.gratis/server/renew?i=79b86ad8-6b2f-423b-a91e-0c003228b5e7",
-    # 账号 02
-    "https://host2play.gratis/server/renew?i=fc3a6ab9-7864-405d-9aba-f78e377137d2",
+    # 账号 02 已封号/服务器不存在（2026-09-18 移除，避免永远续期失败触发自我重试链）
 ]
 
 MAX_CAPTCHA = 3
