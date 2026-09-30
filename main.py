@@ -100,28 +100,48 @@ def get_expire_time(page):
     return "未知"
 
 # ==============================================================================
-# 构建通知
+# 构建通知（瘦身版：表头一行 + 每项一行）
 # ==============================================================================
-def build_notification(success, url, server_name, old_expire, new_expire=None, failure_reason=""):
+def now_local():
+    """UTC+8 当地时间 MM-DD HH:MM（runner 跑 UTC）"""
+    return time.strftime("%m-%d %H:%M", time.gmtime(time.time() + 8 * 3600))
+
+def fmt_expire(value):
+    """到期时间 → MM-DD HH:MM（去年份去秒；解析不了就原样截短）"""
+    text = str(value or "").strip()
+    if not text or text == "未知":
+        return ""
+    for fmt, out_fmt in (("%Y-%m-%d %H:%M:%S", "%m-%d %H:%M"),
+                         ("%Y-%m-%d %H:%M", "%m-%d %H:%M"),
+                         ("%Y-%m-%d", "%m-%d")):
+        try:
+            return datetime.strptime(text[:19], fmt).strftime(out_fmt)
+        except ValueError:
+            continue
+    return text[:16]
+
+def build_notification(success, url, server_name, old_expire, new_expire=None,
+                       failure_reason="", counts=None):
+    """表头（时间 + 成功/失败计数）+ 每台服务器一行；失败跟原因 + 排查提示。
+
+    url / counts 之外的参数含义不变；url 属无信息量水印，只为兼容调用处保留，不再输出。
+    """
+    n_ok, n_bad = counts if counts else ((1, 0) if success else (0, 1))
+    lines = ["<b>🎮 Host2Play 續期 ｜ {} ｜ ✅ {} ｜ ❌ {}</b>".format(now_local(), n_ok, n_bad)]
+    name = html.escape(str(server_name or "未知"), quote=False)
     if success:
-        lines = [
-            "✅ 续订成功",
-            "",
-            f"服务器：{server_name}",
-            f"到期: {old_expire} -> {new_expire}",
-            f"URL: {url}",
-        ]
+        old_s, new_s = fmt_expire(old_expire), fmt_expire(new_expire)
+        if old_s and new_s:
+            status = "✅ 已續期 · 到期 {} → {}".format(old_s, new_s)
+        elif new_s:
+            status = "✅ 已續期 → {}".format(new_s)
+        else:
+            status = "✅ 已續期"
     else:
-        lines = [
-            "❌ 续订失败",
-            "",
-            f"服务器：{server_name}",
-            f"URL: {url}",
-        ]
-        if failure_reason:
-            lines.append(f"失败原因: {failure_reason}")
-    lines.append("")
-    lines.append("Host2Play Auto Renew")
+        status = "❌ {}".format(html.escape((failure_reason or "未知原因").strip()[:60], quote=False))
+    lines.append("▪️ {} · {}".format(name, status))
+    if not success:
+        lines.append("⚠️ 睇 workflow log 排查")
     return "\n".join(lines)
 
 def capture_page_screenshot(page, file_name):
@@ -677,10 +697,13 @@ def main():
         success, server_name, old_expire, new_expire, screenshot, failure_reason = renew_single_url(url)
 
         if success:
-            caption = build_notification(True, url, server_name, old_expire, new_expire)
             total_success += 1
-        else:
-            caption = build_notification(False, url, server_name, old_expire, failure_reason=failure_reason)
+
+        caption = build_notification(
+            success, url, server_name, old_expire, new_expire,
+            failure_reason=failure_reason,
+            counts=(total_success, idx - total_success),
+        )
 
         send_tg_photo(tg_token, tg_chat_id, screenshot, caption, parse_mode='HTML')
 
