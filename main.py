@@ -122,27 +122,18 @@ def fmt_expire(value):
 
 def build_notification(success, url, server_name, old_expire, new_expire=None,
                        failure_reason="", counts=None):
-    """表头（时间 + 成功/失败计数）+ 每台服务器一行；失败跟原因 + 排查提示。
-
-    url / counts 之外的参数含义不变；url 属无信息量水印，只为兼容调用处保留，不再输出。
-    """
-    n_ok, n_bad = counts if counts else ((1, 0) if success else (0, 1))
-    lines = ["<b>🎮 Host2Play 續期 ｜ {} ｜ ✅ {} ｜ ❌ {}</b>".format(now_local(), n_ok, n_bad)]
-    name = html.escape(str(server_name or "未知"), quote=False)
+    """方案 B (極致精簡人話版): 每台永遠精準兩行，消滅頂部計數器"""
+    name = html.escape(str(server_name or "Host2Play").strip(), quote=False)
     if success:
-        old_s, new_s = fmt_expire(old_expire), fmt_expire(new_expire)
-        if old_s and new_s:
-            status = "✅ 已續期 · 到期 {} → {}".format(old_s, new_s)
-        elif new_s:
-            status = "✅ 已續期 → {}".format(new_s)
-        else:
-            status = "✅ 已續期"
+        new_s = fmt_expire(new_expire) or fmt_expire(old_expire)
+        l1 = f"✅ {name} · 成功續期" + (f"至 {new_s}" if new_s else "")
+        l2 = "ℹ️ 服務已自動展期"
+        return f"{l1}\n{l2}"
     else:
-        status = "❌ {}".format(html.escape((failure_reason or "未知原因").strip()[:60], quote=False))
-    lines.append("▪️ {} · {}".format(name, status))
-    if not success:
-        lines.append("⚠️ 睇 workflow log 排查")
-    return "\n".join(lines)
+        l1 = f"🚨 {name} · 續期未完成"
+        reason = html.escape((failure_reason or "未知原因").strip()[:60], quote=False)
+        l2 = f"⚠️ {reason} · 請登入面板手動處理"
+        return f"{l1}\n{l2}"
 
 def capture_page_screenshot(page, file_name):
     try:
